@@ -5,17 +5,21 @@ node_modules/
 /playwright-report/
 /playwright/.cache/
 /blob-report/
+/allure-results/
+/allure-report/
 /.playwright-mcp/
 /tests/**/*-snapshots/
 
 # Build output
 /dist/
+*.tsbuildinfo
 
 # Env / logs / auth state
 .env
 .env.*
 !.env.example
 /utils/*AuthState.json
+*.log
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
@@ -30,3 +34,4 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini

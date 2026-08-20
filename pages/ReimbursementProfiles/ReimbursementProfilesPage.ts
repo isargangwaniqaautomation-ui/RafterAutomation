@@ -11,7 +11,6 @@ export class ReimbursementProfilesPage {
 
   async gotoFromTabBar() {
     await this.locators.reimbursementTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -22,7 +21,6 @@ export class ReimbursementProfilesPage {
 
   async reload() {
     await this.page.reload();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -116,6 +114,44 @@ export class ReimbursementProfilesPage {
   /** Clicks `Save profile` and waits for the app to close the detail panel. */
   async saveProfile(profile: string) {
     await this.locators.saveProfileButton(this.page, profile).click();
+    await this.detailCard(profile).waitFor({ state: 'detached' });
+  }
+
+  assignedTenantsCaption(profile: string) {
+    return this.locators.assignedTenantsCaption(this.page, profile);
+  }
+
+  /** Count the profile card states in its `ASSIGNED TENANTS · n` caption. */
+  async assignedTenantsCaptionCount(profile: string): Promise<number> {
+    const caption = (await this.assignedTenantsCaption(profile).innerText()).trim();
+    const count = Number(caption.split('·').pop()?.trim());
+    if (!Number.isInteger(count)) {
+      throw new Error(`Unrecognised Assigned tenants caption for ${profile}: "${caption}"`);
+    }
+    return count;
+  }
+
+  assignedTenantChips(profile: string) {
+    return this.locators.assignedTenantChips(this.page, profile);
+  }
+
+  /** Every assigned-tenant chip, split into the suite and tenant name it renders. */
+  async assignedTenants(profile: string): Promise<Array<{ suite: string; name: string }>> {
+    const chips = this.assignedTenantChips(profile);
+    await chips.first().waitFor({ state: 'visible' });
+
+    const texts = await chips.allInnerTexts();
+    return texts.map((text) => {
+      const [suite, ...name] = text.trim().split('·');
+      if (name.length === 0) {
+        throw new Error(`Unrecognised assigned-tenant chip: "${text}"`);
+      }
+      return { suite: suite.trim(), name: name.join('·').trim() };
+    });
+  }
+
+  async closeProfileDetails(profile: string) {
+    await this.locators.closeCardButton(this.page, profile).click();
     await this.detailCard(profile).waitFor({ state: 'detached' });
   }
 }

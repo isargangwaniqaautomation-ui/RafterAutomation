@@ -21,7 +21,6 @@ export class ModelHealthPage {
 
   async gotoFromTabBar() {
     await this.locators.modelHealthTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -81,5 +80,35 @@ export class ModelHealthPage {
   async counts(): Promise<{ passed: number; warnings: number }> {
     await this.waitForLoaded();
     return { passed: await this.passedCount(), warnings: await this.warningCount() };
+  }
+
+  aiScanButton() {
+    return this.locators.aiScanButton(this.page);
+  }
+
+  aiScanError() {
+    return this.locators.aiScanError(this.page);
+  }
+
+  checkCards() {
+    return this.locators.checkCards(this.page);
+  }
+
+  /** Test id of every finding card currently on the sheet. */
+  async checkCardIds(): Promise<string[]> {
+    return this.checkCards().evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-testid') ?? ''),
+    );
+  }
+
+  /** True while the scan button reports itself busy or disabled, i.e. a scan is running. */
+  async isScanning(): Promise<boolean> {
+    const button = this.aiScanButton();
+    const busy = await button.getAttribute('aria-busy');
+    return busy === 'true' || !(await button.isEnabled());
+  }
+
+  async startAiScan() {
+    await this.aiScanButton().click();
   }
 }

@@ -11,7 +11,6 @@ export class DocumentsPage {
 
   async gotoFromTabBar() {
     await this.locators.documentsTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 

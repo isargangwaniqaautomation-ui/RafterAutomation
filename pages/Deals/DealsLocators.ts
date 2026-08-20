@@ -1,8 +1,8 @@
 import { Locator, Page } from '@playwright/test';
 
 export const DealsLocators = {
-  dealRow: (page: Page, dealName: string) =>
-    page.locator('[data-testid^="rv2-deal-row-"]').filter({ hasText: dealName }),
+  dealRows: (page: Page) => page.locator('[data-testid^="rv2-deal-row-"]'),
+  dealRow: (page: Page, dealName: string) => DealsLocators.dealRows(page).filter({ hasText: dealName }),
   dealLink: (row: Locator, dealName: string) => row.getByRole('link', { name: `Open deal ${dealName}` }),
   assetTypeCell: (row: Locator) => row.locator('> *').nth(2),
   priceCell: (row: Locator) => row.locator('> *').nth(3),

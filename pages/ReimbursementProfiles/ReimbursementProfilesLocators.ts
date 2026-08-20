@@ -22,4 +22,12 @@ export const ReimbursementProfilesLocators = {
   /** Expanded detail panel of a profile, which holds the Save profile button. */
   detailCard: (page: Page, profile: string) => page.getByTestId(`rv2-reimb-card-${profile}`),
   saveProfileButton: (page: Page, profile: string) => page.getByTestId(`rv2-reimb-save-${profile}`),
+
+  /** `ASSIGNED TENANTS · n` caption inside an expanded profile card. */
+  assignedTenantsCaption: (page: Page, profile: string) =>
+    ReimbursementProfilesLocators.detailCard(page, profile).getByText(/^Assigned tenants · \d+$/),
+  /** One chip per assigned tenant, rendered as `<suite> · <tenant>`. */
+  assignedTenantChips: (page: Page, profile: string) =>
+    ReimbursementProfilesLocators.detailCard(page, profile).locator(`[data-testid^="rv2-reimb-chip-${profile}-"]`),
+  closeCardButton: (page: Page, profile: string) => page.getByTestId(`rv2-reimb-close-${profile}`),
 };

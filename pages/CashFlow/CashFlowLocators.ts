@@ -28,4 +28,27 @@ export const CashFlowLocators = {
   traceContributors: (page: Page) => tracePane(page).locator('[data-testid^="rv2-cf-trace-contrib-"]'),
   traceContributorAmount: (contributor: Locator) => contributor.locator('.rv2-num'),
   traceRentRollLinks: (page: Page) => tracePane(page).locator('[data-testid^="rv2-cf-trace-link-"]'),
+
+  /** Section that carries the read-only outputs the sheet closes with, including the DSCR chart. */
+  outputsInContextLabel: (page: Page) =>
+    page.getByTestId('rv2-sheet-cash-flow').getByText('Outputs in Context', { exact: false }),
+
+  exportButton: (page: Page) =>
+    page.getByTestId('rv2-sheet-cash-flow').getByRole('button', { name: 'Export CSV' }),
+
+  /** DSCR-over-hold chart. Plain DOM bars - no SVG or canvas involved. */
+  dscrChart: (page: Page) => page.getByTestId('rv2-cf-dscr-chart'),
+  /** Covenant reference the chart header carries, e.g. `cov. 1.25x`. */
+  dscrCovenantLabel: (page: Page) => page.getByTestId('rv2-cf-dscr-chart').getByText(/^cov\./),
+  dscrBars: (page: Page) => page.locator('[data-testid^="rv2-cf-dscr-bar-"]'),
+  dscrBar: (page: Page, year: number) => page.getByTestId(`rv2-cf-dscr-bar-${year}`),
+  /** A bar renders its DSCR above the column and the short year below it. */
+  dscrBarValue: (bar: Locator) => bar.locator('.rv2-num'),
+  dscrBarYear: (bar: Locator) => bar.locator('> span').last(),
+  /** The coloured column itself; `data-dscr-color` carries the status the app assigned it. */
+  dscrBarFill: (bar: Locator) => bar.locator('[data-dscr-color]'),
+
+  /** Sticky KPI header tile that reports the hold-period minimum DSCR, e.g. `1.31x`. */
+  minDscrMetric: (page: Page) => page.getByTestId('rv2-metric-dscr_yr1'),
+  metricValue: (metric: Locator) => metric.locator('.sr-only'),
 };

@@ -37,4 +37,17 @@ export const ValuationDebtLocators = {
   solveNote: (page: Page) => page.getByTestId('rv2-vd-solve-note'),
   /** A solved target is pinned to the returns bar and keeps re-solving until it is unpinned. */
   solveUnpinButton: (page: Page) => page.getByTestId('rv2-solve-unpin'),
+
+  /** Sticky KPI header tile that reports the hold-period minimum DSCR, e.g. `1.31x`. */
+  minDscrMetric: (page: Page) => page.getByTestId('rv2-metric-dscr_yr1'),
+
+  /** `LOAN SIZING` strip that closes the sheet. */
+  loanSizingStrip: (page: Page) => page.getByTestId('rv2-vd-governing-chips'),
+  loanSizingLabel: (page: Page) => page.getByTestId('rv2-vd-governing-chips').locator('.rv2-label-upper'),
+  loanSizingChips: (page: Page) => page.locator('[data-testid^="rv2-vd-chip-"]'),
+  loanSizingChip: (page: Page, key: string) => page.getByTestId(`rv2-vd-chip-${key}`),
+  /** Every chip renders a colour-only status dot, then its caption, then the figure. */
+  chipStatusDot: (chip: Locator) => chip.locator('> span').first(),
+  chipLabel: (chip: Locator) => chip.locator('> span').nth(1),
+  chipValue: (chip: Locator) => chip.locator('> strong'),
 };

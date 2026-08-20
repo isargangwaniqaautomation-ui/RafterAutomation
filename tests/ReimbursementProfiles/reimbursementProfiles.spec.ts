@@ -64,4 +64,47 @@ test.describe('Reimbursement Profiles', () => {
     await expect(reimbursementProfilesPage.profileHeader(newProfile)).toBeVisible();
     expect(await reimbursementProfilesPage.selectedType(newProfile)).toBe(NEW_PROFILE_TYPE);
   });
+
+  test('TC-CUJ-30 - NNN profile assigned tenants match the Rent Roll rows marked NNN', async ({ page }) => {
+    const reimbursementProfilesPage = new ReimbursementProfilesPage(page);
+    const rentRollPage = new RentRollPage(page);
+
+    // Rent Roll first: every tenant row, with the suite and the profile the grid shows.
+    await rentRollPage.gotoFromTabBar();
+    const roster = await rentRollPage.tenantRoster();
+    const rentRollNnn = roster
+      .filter((tenant) => tenant.reimbursementProfile === NNN_PROFILE)
+      .map((tenant) => ({ suite: tenant.suite, name: tenant.name }));
+
+    expect(rentRollNnn.length, 'Rent Roll rows assigned to NNN').toBe(EXPECTED_NNN_TENANTS);
+
+    // Then the profile's own Assigned Tenants list.
+    await reimbursementProfilesPage.gotoFromTabBar();
+    await reimbursementProfilesPage.openProfileDetails(NNN_PROFILE);
+    await expect(reimbursementProfilesPage.assignedTenantsCaption(NNN_PROFILE)).toBeVisible();
+
+    const captionCount = await reimbursementProfilesPage.assignedTenantsCaptionCount(NNN_PROFILE);
+    const profileTenants = await reimbursementProfilesPage.assignedTenants(NNN_PROFILE);
+
+    expect(captionCount, 'Assigned tenants caption should agree with the chips it heads').toBe(profileTenants.length);
+    expect(captionCount, 'Assigned tenants count should match the Rent Roll NNN rows').toBe(rentRollNnn.length);
+    expect(await reimbursementProfilesPage.tenantsAssignedCount(NNN_PROFILE)).toBe(rentRollNnn.length);
+    expect(captionCount).toBe(EXPECTED_NNN_TENANTS);
+
+    // The identities have to match too, not just the count. Whitespace and case are normalised;
+    // a different tenant or a different suite is not.
+    const key = (tenant: { suite: string; name: string }) =>
+      `${tenant.suite.replace(/\s+/g, ' ').trim().toLowerCase()} · ${tenant.name.replace(/\s+/g, ' ').trim().toLowerCase()}`;
+    const rentRollKeys = rentRollNnn.map(key).sort();
+    const profileKeys = profileTenants.map(key).sort();
+
+    const missing = rentRollKeys.filter((tenant) => !profileKeys.includes(tenant));
+    const extra = profileKeys.filter((tenant) => !rentRollKeys.includes(tenant));
+    expect(missing, 'NNN tenants on the Rent Roll that the profile does not list').toEqual([]);
+    expect(extra, 'Tenants the profile lists that are not NNN on the Rent Roll').toEqual([]);
+    expect(profileKeys, 'Tenant and suite mapping should match exactly').toEqual(rentRollKeys);
+
+    // Read-only check: the profile is left exactly as it was found.
+    await reimbursementProfilesPage.closeProfileDetails(NNN_PROFILE);
+  });
 });

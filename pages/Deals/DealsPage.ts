@@ -11,7 +11,7 @@ export class DealsPage {
 
   async goto() {
     await this.page.goto('/deals');
-    await this.page.waitForLoadState('networkidle');
+    await this.locators.dealRows(this.page).first().waitFor({ state: 'visible' });
   }
 
   dealRow(dealName: string) {
@@ -21,7 +21,7 @@ export class DealsPage {
   async openDeal(dealName: string) {
     const row = this.dealRow(dealName);
     await this.locators.dealLink(row, dealName).click();
-    await this.page.waitForLoadState('networkidle');
+    await this.locators.breadcrumbDealName(this.page).waitFor({ state: 'visible' });
   }
 
   summaryCells(dealName: string) {

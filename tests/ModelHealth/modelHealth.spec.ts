@@ -13,6 +13,12 @@ const TEST_VACANCY = '5.00';
 const ZERO_VACANCY_CHECK = 'zero-general-vacancy';
 const INLINE_FIX_VACANCY = '4';
 
+// The AI deep scan is a server round trip on a shared trial allowance, so it is given a much
+// longer budget than the sheet's own live checks.
+const SCAN_TIMEOUT = 120000;
+const AI_QUOTA_PATTERN = /AI messages|upgrade/i;
+const CLEAN_SCAN_PATTERN = /no additional|no new|nothing (further|else)|clean/i;
+
 test.describe('Model Health', () => {
   test.skip(!fs.existsSync(AUTH_STATE), 'No stored authenticated session (utils/googleAuthState.json)');
   test.use({ storageState: AUTH_STATE });
@@ -120,5 +126,62 @@ test.describe('Model Health', () => {
     await modelHealthPage.gotoFromTabBar();
     await expect(modelHealthPage.checkCard(ZERO_VACANCY_CHECK)).toBeVisible();
     expect(await modelHealthPage.summaryCounts()).toEqual(baseline);
+  });
+
+  test('TC-CUJ-32 - AI deep scan shows a busy state and then a clear completion state', async ({ page }) => {
+    const modelHealthPage = new ModelHealthPage(page);
+    await modelHealthPage.gotoFromTabBar();
+
+    const scanButton = modelHealthPage.aiScanButton();
+    await expect(scanButton).toBeVisible();
+    await expect(scanButton).toBeEnabled();
+    await expect(scanButton).toHaveText(/AI deep scan/);
+
+    const cardsBefore = await modelHealthPage.checkCardIds();
+
+    await modelHealthPage.startAiScan();
+
+    // The scan either starts, or the app refuses it outright.
+    await expect
+      .poll(async () => (await modelHealthPage.aiScanError().count()) > 0 || (await modelHealthPage.isScanning()), {
+        timeout: 15000,
+        message: 'AI deep scan neither started nor reported why it could not',
+      })
+      .toBe(true);
+
+    if ((await modelHealthPage.aiScanError().count()) === 0) {
+      // Loading feedback has to be visible while the scan runs.
+      expect(await modelHealthPage.isScanning(), 'A busy state should be visible while the scan runs').toBe(true);
+
+      await expect
+        .poll(() => modelHealthPage.isScanning(), {
+          timeout: SCAN_TIMEOUT,
+          message: 'AI deep scan never left its loading state',
+        })
+        .toBe(false);
+    }
+
+    // The trial account's monthly AI allowance is shared, and the scan API answers 403 once it
+    // is spent - which the sheet reports in place of any findings.
+    if ((await modelHealthPage.aiScanError().count()) > 0) {
+      const refusal = (await modelHealthPage.aiScanError().innerText()).trim();
+      test.skip(
+        AI_QUOTA_PATTERN.test(refusal),
+        `AI deep scan cannot be exercised on this account: "${refusal}"`,
+      );
+      throw new Error(`AI deep scan failed: "${refusal}"`);
+    }
+
+    // A returning button is not a completion state on its own: the sheet has to show either
+    // new findings or a clean-scan message.
+    const cardsAfter = await modelHealthPage.checkCardIds();
+    const newCards = cardsAfter.filter((card) => !cardsBefore.includes(card));
+    const sheetText = (await modelHealthPage.locators.sheet(page).innerText()).trim();
+    const cleanScan = CLEAN_SCAN_PATTERN.test(sheetText);
+
+    expect(
+      newCards.length > 0 || cleanScan,
+      'The finished scan should show new finding cards or a clean-scan message',
+    ).toBe(true);
   });
 });

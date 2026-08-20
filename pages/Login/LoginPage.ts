@@ -11,7 +11,11 @@ export class LoginPage {
 
   async goto() {
     await this.page.goto('/login');
-    await this.page.waitForLoadState('networkidle');
+    await this.locators.emailInput(this.page).waitFor({ state: 'visible' });
+    // The form renders before Clerk has hydrated it, and a Sign in click placed in that gap is
+    // silently dropped - no request is sent at all. Clerk publishes its own readiness flag, so
+    // wait on that rather than on a network-quiet heuristic.
+    await this.page.waitForFunction(() => (window as unknown as { Clerk?: { loaded?: boolean } }).Clerk?.loaded === true);
   }
 
   async login(email: string, password: string) {

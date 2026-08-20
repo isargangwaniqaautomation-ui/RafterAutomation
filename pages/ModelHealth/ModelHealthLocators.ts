@@ -17,4 +17,13 @@ export const ModelHealthLocators = {
   checkFixInput: (page: Page, checkId: string) => page.getByTestId(`rv2-check-input-${checkId}`),
   checkFixLabel: (page: Page, checkId: string) => page.locator(`label[for="rv2-check-input-${checkId}"]`),
   checkApplyButton: (page: Page, checkId: string) => page.getByTestId(`rv2-check-apply-${checkId}`),
+
+  aiScanButton: (page: Page) => page.getByTestId('rv2-health-scan'),
+  /** Notice the sheet renders when the scan request is refused, e.g. once the AI quota is spent. */
+  aiScanError: (page: Page) => page.getByTestId('rv2-health-scan-error'),
+  /** Every finding card, excluding the inline fix controls that share the `rv2-check-` prefix. */
+  checkCards: (page: Page) =>
+    page.locator(
+      '[data-testid^="rv2-check-"]:not([data-testid^="rv2-check-input-"]):not([data-testid^="rv2-check-apply-"]):not([data-testid^="rv2-check-fix-"])',
+    ),
 };

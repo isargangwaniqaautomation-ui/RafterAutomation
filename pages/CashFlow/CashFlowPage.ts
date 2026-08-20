@@ -1,5 +1,6 @@
-import { Locator, Page } from '@playwright/test';
+import { Download, Locator, Page } from '@playwright/test';
 import { CashFlowLocators } from './CashFlowLocators';
+import { parseMultiple } from '../ValuationDebt/ValuationDebtPage';
 
 export class CashFlowPage {
   readonly page: Page;
@@ -11,7 +12,6 @@ export class CashFlowPage {
 
   async gotoFromTabBar() {
     await this.locators.cashFlowTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -115,5 +115,81 @@ export class CashFlowPage {
   async closeSource() {
     await this.locators.traceCloseButton(this.page).click();
     await this.locators.tracePane(this.page).waitFor({ state: 'detached' });
+  }
+
+  outputsInContextLabel() {
+    return this.locators.outputsInContextLabel(this.page);
+  }
+
+  dscrChart() {
+    return this.locators.dscrChart(this.page);
+  }
+
+  dscrCovenantLabel() {
+    return this.locators.dscrCovenantLabel(this.page);
+  }
+
+  /** Covenant floor the chart header states, e.g. `cov. 1.25x` -> 1.25. */
+  async covenantDscr(): Promise<number> {
+    return parseMultiple((await this.dscrCovenantLabel().innerText()).trim());
+  }
+
+  dscrBars() {
+    return this.locators.dscrBars(this.page);
+  }
+
+  dscrBar(year: number) {
+    return this.locators.dscrBar(this.page, year);
+  }
+
+  /** Value label a bar renders above its column, e.g. `1.31`. */
+  dscrBarValue(year: number) {
+    return this.locators.dscrBarValue(this.dscrBar(year));
+  }
+
+  /**
+   * Every DSCR bar the chart renders, in chart order. `status` is the state the app
+   * itself assigned the column through `data-dscr-color`, e.g. `pos` or `warn`.
+   */
+  async dscrBarSeries(): Promise<Array<{ year: number; label: string; value: number; status: string }>> {
+    const bars = this.dscrBars();
+    await bars.first().waitFor({ state: 'visible' });
+
+    const series: Array<{ year: number; label: string; value: number; status: string }> = [];
+    for (let index = 0; index < (await bars.count()); index++) {
+      const bar = bars.nth(index);
+      const testId = (await bar.getAttribute('data-testid')) ?? '';
+      const color = (await this.locators.dscrBarFill(bar).getAttribute('data-dscr-color')) ?? '';
+      series.push({
+        year: Number(testId.replace('rv2-cf-dscr-bar-', '')),
+        label: (await this.locators.dscrBarYear(bar).innerText()).trim(),
+        value: Number((await this.locators.dscrBarValue(bar).innerText()).trim()),
+        status: color.replace(/^var\(--rv2-|\)$/g, ''),
+      });
+    }
+    return series;
+  }
+
+  async hoverDscrBar(year: number) {
+    await this.dscrBar(year).hover();
+  }
+
+  /** Hold-period minimum DSCR from the sticky KPI header, e.g. `1.31x`. */
+  async minDscr(): Promise<string> {
+    const metric = this.locators.minDscrMetric(this.page);
+    return (await this.locators.metricValue(metric).innerText()).trim();
+  }
+
+  exportButton() {
+    return this.locators.exportButton(this.page);
+  }
+
+  /** Clicks Export CSV and returns the download the app triggers directly. */
+  async exportCsv(): Promise<Download> {
+    const [download] = await Promise.all([
+      this.page.waitForEvent('download'),
+      this.exportButton().click(),
+    ]);
+    return download;
   }
 }

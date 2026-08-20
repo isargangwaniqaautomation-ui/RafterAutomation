@@ -11,7 +11,6 @@ export class GeneralPage {
 
   async gotoFromTabBar() {
     await this.locators.generalTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -64,5 +63,38 @@ export class GeneralPage {
     await editor.fill(value);
     await editor.press('Tab');
     await editor.waitFor({ state: 'detached' });
+  }
+
+  /** Opens the Snapshots & Scenarios drawer from the sheet's own link. */
+  async openSnapshots() {
+    await this.snapshotsLink().click();
+    await this.locators.snapshotsDrawer(this.page).waitFor({ state: 'visible' });
+    // The drawer renders before its saved snapshots have been fetched.
+    await this.locators.snapshotsLoading(this.page).waitFor({ state: 'detached' });
+  }
+
+  snapshotsDrawer() {
+    return this.locators.snapshotsDrawer(this.page);
+  }
+
+  snapshotNameInput() {
+    return this.locators.snapshotNameInput(this.page);
+  }
+
+  snapshotSaveButton() {
+    return this.locators.snapshotSaveButton(this.page);
+  }
+
+  snapshotsEmptyState() {
+    return this.locators.snapshotsEmptyState(this.page);
+  }
+
+  snapshotRestoreButtons() {
+    return this.locators.snapshotRestoreButtons(this.page);
+  }
+
+  async closeSnapshots() {
+    await this.locators.snapshotsCloseButton(this.page).click();
+    await this.snapshotsDrawer().waitFor({ state: 'detached' });
   }
 }

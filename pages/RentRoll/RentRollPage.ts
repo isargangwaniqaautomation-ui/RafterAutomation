@@ -1,5 +1,6 @@
 import { Locator, Page } from '@playwright/test';
 import { RentRollLocators } from './RentRollLocators';
+import { MarketLeasingLocators } from '../MarketLeasing/MarketLeasingLocators';
 
 /**
  * Converts a displayed money string into a number.
@@ -44,6 +45,14 @@ export function currencyDisplayTolerance(display: string): number {
   return step / 2;
 }
 
+/** One tenant row of the Rent Roll grid. */
+export interface TenantRow {
+  suite: string;
+  name: string;
+  reimbursementProfile: string;
+  hasOptionBadge: boolean;
+}
+
 export class RentRollPage {
   readonly page: Page;
   readonly locators = RentRollLocators;
@@ -54,12 +63,12 @@ export class RentRollPage {
 
   async gotoFromTabBar() {
     await this.locators.rentRollTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
+    await this.locators.grid(this.page).waitFor({ state: 'visible' });
   }
 
   async goToMarketLeasing() {
     await this.locators.marketLeasingTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
+    await MarketLeasingLocators.heading(this.page).waitFor({ state: 'visible' });
   }
 
   occupancyTile() {
@@ -258,5 +267,59 @@ export class RentRollPage {
       }
       return '';
     }, columnIndex);
+  }
+
+  /**
+   * Every tenant row as the grid renders it: suite, tenant name, assigned reimbursement
+   * profile and whether the row carries an `OPT` badge. Read once and reused by the
+   * reimbursement and renewal-option checks so the grid is only walked a single time.
+   */
+  async tenantRoster(): Promise<TenantRow[]> {
+    const suiteIndex = await this.gridColumnIndex('Suite');
+    const profileIndex = await this.gridColumnIndex('Reimb. profile');
+    const rows = this.locators.tenantRows(this.page);
+    await rows.first().waitFor({ state: 'visible' });
+
+    const roster: TenantRow[] = [];
+    for (let index = 0; index < (await rows.count()); index++) {
+      const row = rows.nth(index);
+      const profileCell = this.locators.gridCell(row, profileIndex);
+      roster.push({
+        suite: (await this.locators.gridCell(row, suiteIndex).innerText()).trim(),
+        name: (await this.locators.tenantNameText(row).innerText()).trim(),
+        reimbursementProfile: (await this.locators.gridCellSelectValue(profileCell).innerText()).trim(),
+        hasOptionBadge: (await this.locators.optBadge(row).count()) > 0,
+      });
+    }
+    return roster;
+  }
+
+  optBadge(tenantName: string) {
+    return this.locators.optBadge(this.locators.tenantRow(this.page, tenantName));
+  }
+
+  contractualSection() {
+    return this.locators.contractualSection(this.page);
+  }
+
+  /** Lease citation the contractual block carries, or `null` when no option is configured. */
+  async contractualCitation(): Promise<string | null> {
+    const cite = this.locators.contractualCite(this.page);
+    return (await cite.count()) === 0 ? null : (await cite.innerText()).trim();
+  }
+
+  /** Current value of every contractual-option field, keyed the way the panel labels them. */
+  async contractualValues(): Promise<Record<string, string>> {
+    const fields = this.contractualFields();
+    const values: Record<string, string> = {};
+    for (const [name, field] of Object.entries(fields)) {
+      values[name] = (await field.inputValue()).trim();
+    }
+    return values;
+  }
+
+  async closeTenantRollover() {
+    await this.locators.rolloverCloseButton(this.page).click();
+    await this.rolloverPanel().waitFor({ state: 'detached' });
   }
 }

@@ -33,4 +33,23 @@ export const ExpensesLocators = {
   amountCell: (rows: Locator) => rows.locator(`td:nth-child(${AMOUNT_COLUMN})`),
   perSfCell: (rows: Locator) => rows.locator(`td:nth-child(${PER_SF_COLUMN})`),
   reimbToggle: (row: Locator) => row.getByRole('switch'),
+
+  addLineItemButton: (page: Page) =>
+    page.getByTestId('rv2-sheet-expenses').getByRole('button', { name: 'Add line item' }),
+  deleteRowButton: (page: Page) =>
+    page.getByTestId('rv2-sheet-expenses').getByRole('button', { name: 'Delete row' }),
+
+  /** Modal `Add line item` collects the name and the annual amount; the rest defaults in the grid. */
+  addLineItemDialog: (page: Page) => page.getByRole('dialog', { name: 'Add line item' }),
+  addLineItemNameInput: (page: Page) => page.getByRole('textbox', { name: 'Line item' }),
+  addLineItemAmountInput: (page: Page) => page.getByRole('textbox', { name: 'Annual amount ($)' }),
+  addLineItemSubmit: (page: Page) =>
+    page.getByRole('dialog', { name: 'Add line item' }).getByRole('button', { name: 'Add line item' }),
+
+  /** Deleting asks for confirmation in its own modal before the row is removed. */
+  deleteRowDialog: (page: Page) => page.getByRole('dialog', { name: 'Delete row' }),
+  deleteRowConfirm: (page: Page) =>
+    page.getByRole('dialog', { name: 'Delete row' }).getByRole('button', { name: 'Delete', exact: true }),
+
+  growthCell: (rows: Locator) => rows.locator('td:nth-child(6)'),
 };

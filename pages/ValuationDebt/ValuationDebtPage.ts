@@ -1,11 +1,24 @@
 import { Page } from '@playwright/test';
 import { ValuationDebtLocators } from './ValuationDebtLocators';
 
+/** The four chips the LOAN SIZING strip renders, in the order the sheet renders them. */
+export const LOAN_SIZING_CHIP_KEYS = ['sizing', 'covenant', 'debt-yield', 'trough'] as const;
+export type LoanSizingChipKey = (typeof LOAN_SIZING_CHIP_KEYS)[number];
+
 /** Converts a displayed percentage into a number, e.g. `6.15%` -> 6.15. */
 export function parsePercent(display: string): number {
   const match = display.trim().match(/-?\d+(?:\.\d+)?/);
   if (!match) {
     throw new Error(`Unrecognised percentage format: "${display}"`);
+  }
+  return Number(match[0]);
+}
+
+/** Converts a displayed multiple into a number, e.g. `1.31x` -> 1.31. */
+export function parseMultiple(display: string): number {
+  const match = display.trim().match(/-?\d+(?:\.\d+)?(?=x)/);
+  if (!match) {
+    throw new Error(`Unrecognised multiple format: "${display}"`);
   }
   return Number(match[0]);
 }
@@ -20,13 +33,12 @@ export class ValuationDebtPage {
 
   async gotoFromTabBar() {
     await this.locators.valuationDebtTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.locators.solveCard(this.page).waitFor({ state: 'visible' });
   }
 
   async goToDashboard() {
     await this.locators.dashboardTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
+    await this.locators.heroUnleveredIrr(this.page).waitFor({ state: 'visible' });
   }
 
   /** Displayed `PRICE` value in the sticky KPI header, e.g. `$2.50M`. */
@@ -99,5 +111,40 @@ export class ValuationDebtPage {
       await unpinButton.click();
       await unpinButton.waitFor({ state: 'hidden' });
     }
+  }
+
+  loanSizingStrip() {
+    return this.locators.loanSizingStrip(this.page);
+  }
+
+  loanSizingChips() {
+    return this.locators.loanSizingChips(this.page);
+  }
+
+  loanSizingChip(key: LoanSizingChipKey) {
+    return this.locators.loanSizingChip(this.page, key);
+  }
+
+  /** The colour-only status dot a Loan Sizing chip leads with. */
+  loanSizingStatusDot(key: LoanSizingChipKey) {
+    return this.locators.chipStatusDot(this.loanSizingChip(key));
+  }
+
+  /** Caption, figure and rendered status colour of one Loan Sizing chip. */
+  async loanSizingChipParts(key: LoanSizingChipKey): Promise<{ label: string; value: string; statusColor: string }> {
+    const chip = this.loanSizingChip(key);
+    return {
+      label: (await this.locators.chipLabel(chip).innerText()).trim(),
+      value: (await this.locators.chipValue(chip).innerText()).trim(),
+      statusColor: await this.locators
+        .chipStatusDot(chip)
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    };
+  }
+
+  /** Hold-period minimum DSCR from the sticky KPI header, e.g. `1.31x`. */
+  async minDscr(): Promise<string> {
+    const metric = this.locators.minDscrMetric(this.page);
+    return (await this.locators.metricValue(metric).innerText()).trim();
   }
 }

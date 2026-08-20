@@ -13,6 +13,11 @@ const REIMBURSABLE_LINE_ITEM_AMOUNT = '$19,235';
 const NON_REIMBURSABLE_LINE_ITEM = 'CAMS Management';
 const RATIO_PATTERN = /\d+(\.\d+)?%/;
 
+const NEW_LINE_ITEM = 'QA Test Line';
+const NEW_LINE_ITEM_AMOUNT = '1000';
+const EXPECTED_NEW_AMOUNT = '$1,000';
+const EXPECTED_NEW_GROWTH = '3.00%';
+
 test.describe('Expenses', () => {
   test.skip(!fs.existsSync(AUTH_STATE), 'No stored authenticated session (utils/googleAuthState.json)');
   test.use({ storageState: AUTH_STATE });
@@ -99,5 +104,69 @@ test.describe('Expenses', () => {
         })
         .toBe(baselineRatio);
     }
+  });
+
+  // `Add line item` opens a modal that collects the name and the annual amount; Growth and
+  // Reimb. are defaulted by the grid and set on the created row afterwards.
+  test('TC-CUJ-31 - Add line item creates an expense row, Delete row removes it again', async ({ page }) => {
+    const expensesPage = new ExpensesPage(page);
+
+    const originalTotal = (await expensesPage.totalOpexTile().innerText()).trim();
+    const originalCount = await expensesPage.lineItemCount();
+    expect(originalCount, 'Expense line items before the test').toBeGreaterThan(0);
+    expect(await expensesPage.lineItemNames(), `${NEW_LINE_ITEM} should not already exist`).not.toContain(
+      NEW_LINE_ITEM,
+    );
+
+    const newRow = expensesPage.lineItemRow(NEW_LINE_ITEM);
+
+    try {
+      await expensesPage.openAddLineItem();
+      await expect(expensesPage.locators.addLineItemNameInput(page)).toHaveValue('');
+      await expect(expensesPage.locators.addLineItemAmountInput(page)).toHaveValue('');
+      await expect(expensesPage.locators.addLineItemSubmit(page)).toBeDisabled();
+
+      await expensesPage.submitNewLineItem(NEW_LINE_ITEM, NEW_LINE_ITEM_AMOUNT);
+
+      await expect(newRow).toBeVisible();
+      expect(await expensesPage.lineItemCount()).toBe(originalCount + 1);
+      expect(await expensesPage.lineItemAmount(NEW_LINE_ITEM)).toBe(EXPECTED_NEW_AMOUNT);
+      expect(await expensesPage.lineItemGrowth(NEW_LINE_ITEM)).toBe(EXPECTED_NEW_GROWTH);
+
+      // The grid defaults a new line to reimbursable; the case calls for Reimb. OFF.
+      await expensesPage.setReimbursable(NEW_LINE_ITEM, false);
+      await expect(expensesPage.reimbToggle(NEW_LINE_ITEM)).toHaveAttribute('aria-checked', 'false');
+
+      await expect
+        .poll(() => expensesPage.totalOpexTile().innerText(), {
+          timeout: 15000,
+          message: `TOTAL OPEX did not recalculate after adding ${NEW_LINE_ITEM}`,
+        })
+        .not.toBe(originalTotal);
+
+      const raisedTotal = (await expensesPage.totalOpexTile().innerText()).trim();
+      expect(
+        parseCurrency(raisedTotal) - parseCurrency(originalTotal),
+        `TOTAL OPEX should rise from ${originalTotal} to ${raisedTotal} by exactly ${EXPECTED_NEW_AMOUNT}`,
+      ).toBe(parseCurrency(EXPECTED_NEW_AMOUNT));
+    } finally {
+      // The created row is removed whether or not the assertions above passed, through the
+      // app's own select-then-delete flow, and its removal is verified rather than assumed.
+      if ((await newRow.count()) > 0) {
+        await expensesPage.selectLineItem(NEW_LINE_ITEM);
+        await expensesPage.deleteSelectedRow();
+      }
+    }
+
+    await expect(newRow, `${NEW_LINE_ITEM} should have been deleted`).toHaveCount(0);
+    expect(await expensesPage.lineItemNames()).not.toContain(NEW_LINE_ITEM);
+    expect(await expensesPage.lineItemCount()).toBe(originalCount);
+
+    await expect
+      .poll(() => expensesPage.totalOpexTile().innerText(), {
+        timeout: 15000,
+        message: `TOTAL OPEX did not return to the ${originalTotal} baseline`,
+      })
+      .toBe(originalTotal);
   });
 });

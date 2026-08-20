@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { DealsPage } from '../../pages/Deals/DealsPage';
-import { parseCurrency } from '../../pages/RentRoll/RentRollPage';
-import { ValuationDebtPage, parsePercent } from '../../pages/ValuationDebt/ValuationDebtPage';
+import { currencyDisplayTolerance, parseCurrency } from '../../pages/RentRoll/RentRollPage';
+import {
+  LOAN_SIZING_CHIP_KEYS,
+  ValuationDebtPage,
+  parseMultiple,
+  parsePercent,
+} from '../../pages/ValuationDebt/ValuationDebtPage';
 
 const DEAL_NAME = 'Elm Street Plaza';
 const AUTH_STATE = 'utils/googleAuthState.json';
@@ -19,6 +24,10 @@ const SOLVE_LEVER = 'Purchase price';
 // The solved IRR is displayed to two decimals, so one displayed step is the tightest
 // tolerance the UI can actually be held to.
 const IRR_TOLERANCE = 0.01;
+
+const EXPECTED_SIZING_CHIP = '65.0% LTV → $1.63M';
+const FIRST_HOLD_YEAR = 2025;
+const HOLD_YEARS = 10;
 
 test.describe('Valuation & Debt', () => {
   test.skip(!fs.existsSync(AUTH_STATE), 'No stored authenticated session (utils/googleAuthState.json)');
@@ -97,6 +106,9 @@ test.describe('Valuation & Debt', () => {
       ).toBeLessThanOrEqual(IRR_TOLERANCE);
     } finally {
       await valuationDebtPage.gotoFromTabBar();
+      // Solving pins the target, and a pinned target re-solves the price away again on every
+      // later change - including this restore, and every edit the rest of the suite makes.
+      await valuationDebtPage.unpinSolve();
       await valuationDebtPage.setPurchasePrice(String(baselineAmount));
 
       await expect
@@ -112,5 +124,67 @@ test.describe('Valuation & Debt', () => {
         })
         .toBe(BASELINE_HEADER_PRICE);
     }
+  });
+
+  // TC-CUJ-26 documents `DSCR 1.64x ≥ 1.25x`, `10.07%` and `1.56x · 2031`. Those figures belong to
+  // an earlier, higher-NOI state of the sample deal (the same drift the Cash Flow specs record for
+  // 2025 NOI). The chips are therefore checked against the model the app is actually holding:
+  // the Sizing chip against the sheet's own Purchase Price and Loan-to-Value, the covenant against
+  // its own floor, and the trough against the sticky MIN DSCR tile.
+  test('TC-CUJ-26 - Loan Sizing renders four chips with figures and visible status indicators', async ({ page }) => {
+    const valuationDebtPage = new ValuationDebtPage(page);
+
+    const strip = valuationDebtPage.loanSizingStrip();
+    await strip.scrollIntoViewIfNeeded();
+    await expect(strip).toBeVisible();
+    await expect(valuationDebtPage.locators.loanSizingLabel(page)).toHaveText(/^Loan sizing$/i);
+    await expect(valuationDebtPage.loanSizingChips()).toHaveCount(4);
+
+    const chips: Record<string, { label: string; value: string; statusColor: string }> = {};
+    for (const key of LOAN_SIZING_CHIP_KEYS) {
+      await expect(valuationDebtPage.loanSizingChip(key)).toBeVisible();
+
+      // The indicator is a colour-only dot, so its presence is asserted on the element itself
+      // and its colour is only checked for being painted at all.
+      const dot = valuationDebtPage.loanSizingStatusDot(key);
+      await expect(dot, `${key} chip should render a status indicator`).toBeVisible();
+
+      const parts = await valuationDebtPage.loanSizingChipParts(key);
+      expect(parts.statusColor, `${key} status indicator should be painted`).toMatch(/^rgba?\(/);
+      expect(parts.statusColor, `${key} status indicator should not be transparent`).not.toBe('rgba(0, 0, 0, 0)');
+      chips[key] = parts;
+    }
+
+    expect(Object.values(chips).map((chip) => chip.label)).toEqual([
+      'Sizing',
+      'Covenant',
+      'Debt yield',
+      'Trough DSCR',
+    ]);
+
+    // Sizing: `65.0% LTV → $1.63M`, i.e. the sheet's own LTV applied to its own Purchase Price.
+    expect(chips.sizing.value).toBe(EXPECTED_SIZING_CHIP);
+    const [sizingLtv, sizingLoan] = chips.sizing.value.split('→').map((part) => part.trim());
+    expect(sizingLtv).toBe(`${await valuationDebtPage.loanToValue()} LTV`);
+    const impliedLoan = parseCurrency(await valuationDebtPage.purchasePrice()) * (parsePercent(sizingLtv) / 100);
+    expect(Math.abs(parseCurrency(sizingLoan) - impliedLoan)).toBeLessThanOrEqual(
+      currencyDisplayTolerance(sizingLoan),
+    );
+
+    // Covenant: `DSCR <actual> ≥ <floor>`, and the deal has to be clearing that floor.
+    expect(chips.covenant.value).toMatch(/^DSCR \d+\.\d{2}x ≥ \d+\.\d{2}x$/);
+    const [covenantActual, covenantFloor] = chips.covenant.value.split('≥').map((part) => parseMultiple(part));
+    expect(covenantActual).toBeGreaterThanOrEqual(covenantFloor);
+
+    expect(chips['debt-yield'].value).toMatch(/^\d+\.\d{2}%$/);
+    expect(parsePercent(chips['debt-yield'].value)).toBeGreaterThan(0);
+
+    // Trough DSCR: `<value> · <year>`, the hold-period minimum the KPI header also reports.
+    expect(chips.trough.value).toMatch(/^\d+\.\d{2}x · \d{4}$/);
+    const [troughValue, troughYear] = chips.trough.value.split('·').map((part) => part.trim());
+    expect(parseMultiple(troughValue)).toBe(parseMultiple(await valuationDebtPage.minDscr()));
+    expect(parseMultiple(troughValue)).toBeLessThanOrEqual(covenantActual);
+    expect(Number(troughYear)).toBeGreaterThanOrEqual(FIRST_HOLD_YEAR);
+    expect(Number(troughYear)).toBeLessThanOrEqual(FIRST_HOLD_YEAR + HOLD_YEARS - 1);
   });
 });

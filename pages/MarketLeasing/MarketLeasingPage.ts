@@ -11,7 +11,6 @@ export class MarketLeasingPage {
 
   async gotoFromTabBar() {
     await this.locators.marketLeasingTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 
@@ -22,7 +21,6 @@ export class MarketLeasingPage {
 
   async reload() {
     await this.page.reload();
-    await this.page.waitForLoadState('networkidle');
     await this.waitForLoaded();
   }
 

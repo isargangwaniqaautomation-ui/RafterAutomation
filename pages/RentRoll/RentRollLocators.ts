@@ -69,4 +69,12 @@ export const RentRollLocators = {
     cashFlowPanel(page).getByRole('table').getByRole('row').filter({ hasText: label }),
   cashFlowCloseButton: (page: Page) =>
     cashFlowPanel(page).getByRole('button', { name: 'Close cash flow drilldown' }),
+
+  /** Tenant name without the badges the cell renders next to it. */
+  tenantNameText: (row: Locator) => row.locator('.rv2-grid-nametext'),
+  /** `OPT` badge, shown for tenants that hold a contractual renewal option. */
+  optBadge: (row: Locator) => row.locator('[data-testid^="rv2-opt-tag-"]'),
+  /** Lease citation the contractual block carries, e.g. `Option 1 · 2026-03-01 → 2031-02-28`. */
+  contractualCite: (page: Page) => page.getByTestId('rv2-roll-contractual').locator('.rv2-roll-cite'),
+  rolloverCloseButton: (page: Page) => page.getByTestId('rv2-roll-close'),
 };

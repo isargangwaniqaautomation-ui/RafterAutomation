@@ -1,5 +1,14 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { DashboardLocators } from './DashboardLocators';
+
+/** Sources & Uses rows, keyed by the test id suffix the panel renders. */
+export type SourcesUsesRowKey =
+  | 'senior-debt'
+  | 'equity'
+  | 'purchase-price'
+  | 'closing-costs'
+  | 'financing-costs'
+  | 'operating-reserve';
 
 export class DashboardPage {
   readonly page: Page;
@@ -11,7 +20,6 @@ export class DashboardPage {
 
   async gotoFromTabBar() {
     await this.locators.dashboardTab(this.page).click();
-    await this.page.waitForLoadState('networkidle');
     await this.locators.yr1NoiTile(this.page).waitFor({ state: 'visible' });
   }
 
@@ -56,5 +64,58 @@ export class DashboardPage {
       unleveredIrr: this.locators.unleveredIrrTile(this.page),
       cashOnCash: this.locators.cashOnCashTile(this.page),
     };
+  }
+
+  sourcesUsesPanel() {
+    return this.locators.sourcesUses(this.page);
+  }
+
+  susRow(key: SourcesUsesRowKey) {
+    return this.locators.susRow(this.page, key);
+  }
+
+  /** Displayed label of a Sources & Uses row, e.g. `Senior debt · 65.0% LTV`. */
+  async susRowLabel(key: SourcesUsesRowKey): Promise<string> {
+    return (await this.locators.susRowLabel(this.susRow(key)).innerText()).trim();
+  }
+
+  /** Displayed money figure of a Sources & Uses row, e.g. `$1,625,000`. */
+  async susRowAmount(key: SourcesUsesRowKey): Promise<string> {
+    return (await this.locators.susRowValue(this.susRow(key)).innerText()).trim();
+  }
+
+  async totalSources(): Promise<string> {
+    return (await this.locators.susTotalValue(this.locators.susTotalSources(this.page)).innerText()).trim();
+  }
+
+  async totalUses(): Promise<string> {
+    return (await this.locators.susTotalValue(this.locators.susTotalUses(this.page)).innerText()).trim();
+  }
+
+  trialNotice() {
+    return this.locators.trialNotice(this.page);
+  }
+
+  upgradeButton() {
+    return this.locators.trialUpgradeButton(this.page);
+  }
+
+  collapseTrialNoticeButton() {
+    return this.locators.trialCollapseButton(this.page);
+  }
+
+  async isTrialNoticeCollapsed(): Promise<boolean> {
+    return (await this.trialNotice().getAttribute('data-collapsed')) === 'true';
+  }
+
+  async collapseTrialNotice() {
+    await this.collapseTrialNoticeButton().click();
+    await expect(this.trialNotice()).toHaveAttribute('data-collapsed', 'true');
+  }
+
+  /** Collapsed, the banner is itself the button that re-opens it. */
+  async expandTrialNotice() {
+    await this.trialNotice().click();
+    await expect(this.trialNotice()).toHaveAttribute('data-collapsed', 'false');
   }
 }
